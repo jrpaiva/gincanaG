@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <link rel="manifest" href="/manifest.json">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GincanaG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para o menu lateral */
+        .menu-lateral {
+            transition: transform 0.3s ease-in-out;
+        }
+        .menu-lateral.colapsado {
+            transform: translateX(-100%);
+        }
+        @media (min-width: 768px) {
+            .menu-lateral.colapsado {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Título no topo com botão de menu -->
+    <header class="bg-blue-600 text-white py-4 shadow-lg fixed w-full z-10">
+        <div class="container mx-auto flex justify-between items-center px-4">
+            <!-- Botão de menu no lado esquerdo -->
+            <button id="botaoMenu" class="md:hidden text-gray-200 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+            </button>
+            <h1 class="text-3xl font-bold">GincanaG</h1>
+        </div>
+    </header>
+
+    <!-- Menu lateral e conteúdo principal -->
+    <div class="flex pt-16"> <!-- Adicionado padding-top para compensar o cabeçalho fixo -->
+        <!-- Menu lateral -->
+        <nav class="menu-lateral bg-white w-64 min-h-screen p-4 shadow-lg fixed md:relative">
+            <ul class="space-y-2">
+                <li><button class="w-full text-left px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onclick="mostrarSecao('equipes')">Equipes</button></li>
+                <li><button class="w-full text-left px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onclick="mostrarSecao('membros')">Membros</button></li>
+                <li><button class="w-full text-left px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onclick="mostrarSecao('pontuacao')">Pontuação</button></li>
+            </ul>
+        </nav>
+
+        <!-- Conteúdo principal -->
+        <main class="flex-1 p-6 ml-0 md:ml-64">
+            <!-- Botão para zerar todos os dados -->
+            <div class="text-right mb-6">
+                <button class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600" onclick="confirmarZerarDados()">Zerar Todos os Dados</button>
+            </div>
+
+            <!-- Placar -->
+            <div id="placar" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
+
+            <!-- Seções -->
+            <div id="equipes" class="section bg-white p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-bold mb-4">Gerenciar Equipes</h2>
+                <div class="space-y-4">
+                    <input type="text" id="nomeEquipe" class="w-full p-2 border rounded-lg" placeholder="Nome da Equipe">
+                    <input type="text" id="liderEquipe" class="w-full p-2 border rounded-lg" placeholder="Líder da Equipe">
+                    <input type="color" id="corEquipe" class="w-full p-1 border rounded-lg">
+                    <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="adicionarEquipe()">Adicionar</button>
+                </div>
+                <ul id="listaEquipes" class="mt-4 space-y-2"></ul>
+            </div>
+
+            <div id="membros" class="section hidden bg-white p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-bold mb-4">Gerenciar Membros</h2>
+                <div class="space-y-4">
+                    <select id="selecionarEquipe" class="w-full p-2 border rounded-lg"></select>
+                    <input type="text" id="nomeMembro" class="w-full p-2 border rounded-lg" placeholder="Nome do Membro">
+                    <button class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600" onclick="adicionarMembro()">Adicionar</button>
+                    <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="exportarMembrosParaWhatsApp()">Exportar Membros para WhatsApp</button>
+                </div>
+                <div id="listaMembrosAgrupados" class="mt-4 space-y-4"></div>
+            </div>
+
+            <div id="pontuacao" class="section hidden bg-white p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-bold mb-4">Pontuação</h2>
+                <div class="space-y-4">
+                    <input type="text" id="nomeDesafio" class="w-full p-2 border rounded-lg" placeholder="Nome do Desafio">
+                    <input type="number" id="pontosDesafio" class="w-full p-2 border rounded-lg" placeholder="Pontuação">
+                    <select id="selecionarEquipePontos" class="w-full p-2 border rounded-lg"></select>
+                    <button class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600" onclick="adicionarPontos()">Adicionar</button>
+                    <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="exportarParaWhatsApp()">Exportar para WhatsApp</button>
+                </div>
+                <h3 class="text-xl font-bold mt-6">Histórico de Desafios</h3>
+                <ul id="historicoDesafios" class="mt-4 space-y-2"></ul>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let equipes = JSON.parse(localStorage.getItem('equipes')) || [];
+        let membros = JSON.parse(localStorage.getItem('membros')) || [];
+        let pontuacoes = JSON.parse(localStorage.getItem('pontuacoes')) || {};
+        let historicoDesafios = JSON.parse(localStorage.getItem('historicoDesafios')) || [];
+
+        // Função para alternar o menu lateral no mobile
+        document.getElementById('botaoMenu').addEventListener('click', () => {
+            const menu = document.querySelector('.menu-lateral');
+            menu.classList.toggle('colapsado');
+        });
+
+        // Função para mostrar uma seção e recolher o menu lateral (em dispositivos móveis)
+        function mostrarSecao(id) {
+            document.querySelectorAll('.section').forEach(sec => sec.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+
+            // Recolhe o menu lateral em dispositivos móveis
+            if (window.innerWidth < 768) {
+                const menu = document.querySelector('.menu-lateral');
+                menu.classList.add('colapsado');
+            }
+        }
+
+        function salvarDados() {
+            localStorage.setItem('equipes', JSON.stringify(equipes));
+            localStorage.setItem('membros', JSON.stringify(membros));
+            localStorage.setItem('pontuacoes', JSON.stringify(pontuacoes));
+            localStorage.setItem('historicoDesafios', JSON.stringify(historicoDesafios));
+        }
+
+        function adicionarEquipe() {
+            let nome = document.getElementById('nomeEquipe').value;
+            let lider = document.getElementById('liderEquipe').value;
+            let cor = document.getElementById('corEquipe').value;
+            if (!nome || !lider) return;
+            equipes.push({ nome, lider, cor });
+            pontuacoes[nome] = 0;
+            salvarDados();
+            atualizarListas();
+        }
+
+        function adicionarMembro() {
+            let equipe = document.getElementById('selecionarEquipe').value;
+            let nome = document.getElementById('nomeMembro').value;
+            if (!nome || !equipe) return;
+            membros.push({ nome, equipe });
+            salvarDados();
+            atualizarListas();
+        }
+
+        function adicionarPontos() {
+            let equipe = document.getElementById('selecionarEquipePontos').value;
+            let pontos = parseInt(document.getElementById('pontosDesafio').value) || 0;
+            let desafio = document.getElementById('nomeDesafio').value;
+            if (!equipe || !desafio) return;
+            pontuacoes[equipe] += pontos;
+            historicoDesafios.push({ desafio, equipe, pontos });
+            salvarDados();
+            atualizarListas();
+        }
+
+        function removerEquipe(nomeEquipe) {
+            equipes = equipes.filter(eq => eq.nome !== nomeEquipe);
+            membros = membros.filter(m => m.equipe !== nomeEquipe);
+            delete pontuacoes[nomeEquipe];
+            salvarDados();
+            atualizarListas();
+        }
+
+        function removerMembro(nomeMembro) {
+            membros = membros.filter(m => m.nome !== nomeMembro);
+            salvarDados();
+            atualizarListas();
+        }
+
+        function removerDesafio(index) {
+            historicoDesafios.splice(index, 1);
+            salvarDados();
+            atualizarListas();
+        }
+
+        function exportarParaWhatsApp() {
+            let placarTexto = "🏆 *Placar Atual* 🏆\n\n";
+            Object.keys(pontuacoes).sort((a, b) => pontuacoes[b] - pontuacoes[a]).forEach(eq => {
+                placarTexto += `*${eq}*: ${pontuacoes[eq]} pontos\n`;
+            });
+
+            let historicoTexto = "\n📜 *Histórico de Desafios* 📜\n\n";
+            historicoDesafios.forEach((desafio, index) => {
+                historicoTexto += `✅ ${desafio.desafio} - ${desafio.equipe} (+${desafio.pontos} pontos)\n`;
+            });
+
+            let textoCompleto = placarTexto + historicoTexto;
+            let textoCodificado = encodeURIComponent(textoCompleto);
+            window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
+        }
+
+        function exportarMembrosParaWhatsApp() {
+            let textoMembros = "👥 *Lista de Membros por Equipe* 👥\n\n";
+            equipes.forEach(eq => {
+                let membrosDaEquipe = membros.filter(m => m.equipe === eq.nome);
+                textoMembros += `*${eq.nome}* (Líder: ${eq.lider})\n`;
+                membrosDaEquipe.forEach(m => {
+                    textoMembros += `- ${m.nome}\n`;
+                });
+                textoMembros += "\n";
+            });
+
+            let textoCodificado = encodeURIComponent(textoMembros);
+            window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
+        }
+
+        function confirmarZerarDados() {
+            if (confirm("Tem certeza que deseja zerar todos os dados? Essa ação não pode ser desfeita.")) {
+                zerarDados();
+            }
+        }
+
+        function zerarDados() {
+            equipes = [];
+            membros = [];
+            pontuacoes = {};
+            historicoDesafios = [];
+            localStorage.clear();
+            atualizarListas();
+        }
+
+        function atualizarListas() {
+            let listaEquipes = document.getElementById('listaEquipes');
+            let selecionarEquipe = document.getElementById('selecionarEquipe');
+            let selecionarEquipePontos = document.getElementById('selecionarEquipePontos');
+            let listaMembrosAgrupados = document.getElementById('listaMembrosAgrupados');
+            let placar = document.getElementById('placar');
+            let historicoDesafiosElement = document.getElementById('historicoDesafios');
+
+            // Atualiza lista de equipes
+            listaEquipes.innerHTML = '';
+            selecionarEquipe.innerHTML = '';
+            selecionarEquipePontos.innerHTML = '';
+            equipes.forEach(eq => {
+                let li = document.createElement('li');
+                li.className = "flex justify-between items-center p-2 bg-blue-50 rounded-lg";
+                li.innerHTML = `${eq.nome} (Líder: ${eq.lider}, Cor: ${eq.cor}) <button class="bg-red-500 text-white px-2 py-1 rounded-lg hover:bg-red-600" onclick="removerEquipe('${eq.nome}')">Excluir</button>`;
+                listaEquipes.appendChild(li);
+
+                let option = document.createElement('option');
+                option.value = eq.nome;
+                option.textContent = eq.nome;
+                selecionarEquipe.appendChild(option);
+                selecionarEquipePontos.appendChild(option.cloneNode(true));
+            });
+
+            // Atualiza lista de membros agrupados por equipe
+            listaMembrosAgrupados.innerHTML = '';
+            equipes.forEach(eq => {
+                let membrosDaEquipe = membros.filter(m => m.equipe === eq.nome);
+                let card = document.createElement('div');
+                card.className = "bg-white p-4 rounded-lg shadow-md";
+                card.innerHTML = `
+                    <div class="font-bold mb-2">${eq.nome} (Líder: ${eq.lider})</div>
+                    <ul class="space-y-2">
+                        ${membrosDaEquipe.map(m => `
+                            <li class="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                                ${m.nome}
+                                <button class="bg-red-500 text-white px-2 py-1 rounded-lg hover:bg-red-600" onclick="removerMembro('${m.nome}')">Excluir</button>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+                listaMembrosAgrupados.appendChild(card);
+            });
+
+            // Atualiza placar
+            placar.innerHTML = '';
+            Object.keys(pontuacoes).sort((a, b) => pontuacoes[b] - pontuacoes[a]).forEach(eq => {
+                let equipeInfo = equipes.find(e => e.nome === eq);
+                let card = document.createElement('div');
+                card.className = "bg-white p-4 rounded-lg shadow-md text-center";
+                card.style.backgroundColor = equipeInfo.cor;
+                card.innerHTML = `<strong class="text-white">${eq}</strong><br><span class="text-white">${pontuacoes[eq]} pontos</span>`;
+                placar.appendChild(card);
+            });
+
+            // Atualiza histórico de desafios
+            historicoDesafiosElement.innerHTML = '';
+            historicoDesafios.forEach((desafio, index) => {
+                let li = document.createElement('li');
+                li.className = "flex justify-between items-center p-2 bg-gray-50 rounded-lg";
+                li.innerHTML = `
+                    <span>${desafio.desafio} - ${desafio.equipe} (+${desafio.pontos} pontos)</span>
+                    <button class="text-red-500 hover:text-red-700" onclick="removerDesafio(${index})">🗑️</button>
+                `;
+                historicoDesafiosElement.appendChild(li);
+            });
+        }
+
+        atualizarListas();
+    </script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registrado com sucesso:', registration);
+        })
+        .catch((error) => {
+          console.log('Falha ao registrar o Service Worker:', error);
+        });
+    });
+  }
+</script>
+</body>
+</html>
