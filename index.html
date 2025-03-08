@@ -93,206 +93,415 @@
             </div>
         </main>
     </div>
-
     <script>
-        let equipes = JSON.parse(localStorage.getItem('equipes')) || [];
-        let membros = JSON.parse(localStorage.getItem('membros')) || [];
-        let pontuacoes = JSON.parse(localStorage.getItem('pontuacoes')) || {};
-        let historicoDesafios = JSON.parse(localStorage.getItem('historicoDesafios')) || [];
+let db;
 
-        // Função para alternar o menu lateral no mobile
-        document.getElementById('botaoMenu').addEventListener('click', () => {
-            const menu = document.querySelector('.menu-lateral');
-            menu.classList.toggle('colapsado');
+// Abre ou cria o banco de dados IndexedDB
+const request = indexedDB.open('GincanaGDB', 1);
+
+request.onupgradeneeded = (event) => {
+  db = event.target.result;
+
+  // Cria a object store para equipes
+  if (!db.objectStoreNames.contains('equipes')) {
+    db.createObjectStore('equipes', { keyPath: 'nome' });
+  }
+
+  // Cria a object store para membros
+  if (!db.objectStoreNames.contains('membros')) {
+    db.createObjectStore('membros', { keyPath: 'id', autoIncrement: true });
+  }
+
+  // Cria a object store para pontuações
+  if (!db.objectStoreNames.contains('pontuacoes')) {
+    db.createObjectStore('pontuacoes', { keyPath: 'equipe' });
+  }
+
+  // Cria a object store para histórico de desafios
+  if (!db.objectStoreNames.contains('historicoDesafios')) {
+    db.createObjectStore('historicoDesafios', { keyPath: 'id', autoIncrement: true });
+  }
+};
+
+request.onsuccess = (event) => {
+  db = event.target.result;
+  console.log('Banco de dados aberto com sucesso!');
+  carregarDadosIniciais();
+};
+
+request.onerror = (event) => {
+  console.error('Erro ao abrir o banco de dados:', event.target.error);
+};
+
+// Função para carregar dados iniciais (equipes, membros e pontuações)
+function carregarDadosIniciais() {
+  buscarEquipes((equipes) => {
+    buscarMembros((membros) => {
+      buscarPontuacoes((pontuacoes) => {
+        buscarHistoricoDesafios((historicoDesafios) => {
+          atualizarListas(equipes, membros, pontuacoes, historicoDesafios);
         });
+      });
+    });
+  });
+}
 
-        // Função para mostrar uma seção e recolher o menu lateral (em dispositivos móveis)
-        function mostrarSecao(id) {
-            document.querySelectorAll('.section').forEach(sec => sec.classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
+// Função para adicionar uma equipe
+function adicionarEquipe() {
+  const nome = document.getElementById('nomeEquipe').value;
+  const lider = document.getElementById('liderEquipe').value;
+  const cor = document.getElementById('corEquipe').value;
 
-            // Recolhe o menu lateral em dispositivos móveis
-            if (window.innerWidth < 768) {
-                const menu = document.querySelector('.menu-lateral');
-                menu.classList.add('colapsado');
-            }
-        }
+  if (!nome || !lider) return;
 
-        function salvarDados() {
-            localStorage.setItem('equipes', JSON.stringify(equipes));
-            localStorage.setItem('membros', JSON.stringify(membros));
-            localStorage.setItem('pontuacoes', JSON.stringify(pontuacoes));
-            localStorage.setItem('historicoDesafios', JSON.stringify(historicoDesafios));
-        }
+  const transaction = db.transaction(['equipes', 'pontuacoes'], 'readwrite');
+  const equipeStore = transaction.objectStore('equipes');
+  const pontuacaoStore = transaction.objectStore('pontuacoes');
 
-        function adicionarEquipe() {
-            let nome = document.getElementById('nomeEquipe').value;
-            let lider = document.getElementById('liderEquipe').value;
-            let cor = document.getElementById('corEquipe').value;
-            if (!nome || !lider) return;
-            equipes.push({ nome, lider, cor });
-            pontuacoes[nome] = 0;
-            salvarDados();
-            atualizarListas();
-        }
+  // Adiciona a equipe
+  equipeStore.add({ nome, lider, cor });
 
-        function adicionarMembro() {
-            let equipe = document.getElementById('selecionarEquipe').value;
-            let nome = document.getElementById('nomeMembro').value;
-            if (!nome || !equipe) return;
-            membros.push({ nome, equipe });
-            salvarDados();
-            atualizarListas();
-        }
+  // Inicializa a pontuação da equipe
+  pontuacaoStore.add({ equipe: nome, pontos: 0 });
 
-        function adicionarPontos() {
-            let equipe = document.getElementById('selecionarEquipePontos').value;
-            let pontos = parseInt(document.getElementById('pontosDesafio').value) || 0;
-            let desafio = document.getElementById('nomeDesafio').value;
-            if (!equipe || !desafio) return;
-            pontuacoes[equipe] += pontos;
-            historicoDesafios.push({ desafio, equipe, pontos });
-            salvarDados();
-            atualizarListas();
-        }
+  transaction.oncomplete = () => {
+    console.log('Equipe e pontuação adicionadas com sucesso!');
+    carregarDadosIniciais();
+  };
 
-        function removerEquipe(nomeEquipe) {
-            equipes = equipes.filter(eq => eq.nome !== nomeEquipe);
-            membros = membros.filter(m => m.equipe !== nomeEquipe);
-            delete pontuacoes[nomeEquipe];
-            salvarDados();
-            atualizarListas();
-        }
+  transaction.onerror = (event) => {
+    console.error('Erro ao adicionar equipe:', event.target.error);
+  };
+}
 
-        function removerMembro(nomeMembro) {
-            membros = membros.filter(m => m.nome !== nomeMembro);
-            salvarDados();
-            atualizarListas();
-        }
+// Função para adicionar um membro
+function adicionarMembro() {
+  const equipe = document.getElementById('selecionarEquipe').value;
+  const nome = document.getElementById('nomeMembro').value;
 
-        function removerDesafio(index) {
-            historicoDesafios.splice(index, 1);
-            salvarDados();
-            atualizarListas();
-        }
+  if (!nome || !equipe) return;
 
-        function exportarParaWhatsApp() {
-            let placarTexto = "🏆 *Placar Atual* 🏆\n\n";
-            Object.keys(pontuacoes).sort((a, b) => pontuacoes[b] - pontuacoes[a]).forEach(eq => {
-                placarTexto += `*${eq}*: ${pontuacoes[eq]} pontos\n`;
-            });
+  const transaction = db.transaction(['membros'], 'readwrite');
+  const store = transaction.objectStore('membros');
 
-            let historicoTexto = "\n📜 *Histórico de Desafios* 📜\n\n";
-            historicoDesafios.forEach((desafio, index) => {
-                historicoTexto += `✅ ${desafio.desafio} - ${desafio.equipe} (+${desafio.pontos} pontos)\n`;
-            });
+  store.add({ nome, equipe });
 
-            let textoCompleto = placarTexto + historicoTexto;
-            let textoCodificado = encodeURIComponent(textoCompleto);
-            window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
-        }
+  transaction.oncomplete = () => {
+    console.log('Membro adicionado com sucesso!');
+    carregarDadosIniciais();
+  };
 
-        function exportarMembrosParaWhatsApp() {
-            let textoMembros = "👥 *Lista de Membros por Equipe* 👥\n\n";
-            equipes.forEach(eq => {
-                let membrosDaEquipe = membros.filter(m => m.equipe === eq.nome);
-                textoMembros += `*${eq.nome}* (Líder: ${eq.lider})\n`;
-                membrosDaEquipe.forEach(m => {
-                    textoMembros += `- ${m.nome}\n`;
-                });
-                textoMembros += "\n";
-            });
+  transaction.onerror = (event) => {
+    console.error('Erro ao adicionar membro:', event.target.error);
+  };
+}
 
-            let textoCodificado = encodeURIComponent(textoMembros);
-            window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
-        }
+// Função para adicionar pontos
+function adicionarPontos() {
+  const equipe = document.getElementById('selecionarEquipePontos').value;
+  const pontos = parseInt(document.getElementById('pontosDesafio').value) || 0;
+  const desafio = document.getElementById('nomeDesafio').value;
 
-        function confirmarZerarDados() {
-            if (confirm("Tem certeza que deseja zerar todos os dados? Essa ação não pode ser desfeita.")) {
-                zerarDados();
-            }
-        }
+  if (!equipe || !desafio) return;
 
-        function zerarDados() {
-            equipes = [];
-            membros = [];
-            pontuacoes = {};
-            historicoDesafios = [];
-            localStorage.clear();
-            atualizarListas();
-        }
+  const transaction = db.transaction(['pontuacoes', 'historicoDesafios'], 'readwrite');
+  const pontuacaoStore = transaction.objectStore('pontuacoes');
+  const historicoStore = transaction.objectStore('historicoDesafios');
 
-        function atualizarListas() {
-            let listaEquipes = document.getElementById('listaEquipes');
-            let selecionarEquipe = document.getElementById('selecionarEquipe');
-            let selecionarEquipePontos = document.getElementById('selecionarEquipePontos');
-            let listaMembrosAgrupados = document.getElementById('listaMembrosAgrupados');
-            let placar = document.getElementById('placar');
-            let historicoDesafiosElement = document.getElementById('historicoDesafios');
+  // Atualiza a pontuação da equipe
+  const request = pontuacaoStore.get(equipe);
+  request.onsuccess = (event) => {
+    const data = event.target.result;
+    data.pontos += pontos;
+    pontuacaoStore.put(data);
+  };
 
-            // Atualiza lista de equipes
-            listaEquipes.innerHTML = '';
-            selecionarEquipe.innerHTML = '';
-            selecionarEquipePontos.innerHTML = '';
-            equipes.forEach(eq => {
-                let li = document.createElement('li');
-                li.className = "flex justify-between items-center p-2 bg-blue-50 rounded-lg";
-                li.innerHTML = `${eq.nome} (Líder: ${eq.lider}, Cor: ${eq.cor}) <button class="bg-red-500 text-white px-2 py-1 rounded-lg hover:bg-red-600" onclick="removerEquipe('${eq.nome}')">Excluir</button>`;
-                listaEquipes.appendChild(li);
+  // Adiciona ao histórico de desafios
+  historicoStore.add({ desafio, equipe, pontos });
 
-                let option = document.createElement('option');
-                option.value = eq.nome;
-                option.textContent = eq.nome;
-                selecionarEquipe.appendChild(option);
-                selecionarEquipePontos.appendChild(option.cloneNode(true));
-            });
+  transaction.oncomplete = () => {
+    console.log('Pontos e histórico atualizados com sucesso!');
+    carregarDadosIniciais();
+  };
 
-            // Atualiza lista de membros agrupados por equipe
-            listaMembrosAgrupados.innerHTML = '';
-            equipes.forEach(eq => {
-                let membrosDaEquipe = membros.filter(m => m.equipe === eq.nome);
-                let card = document.createElement('div');
-                card.className = "bg-white p-4 rounded-lg shadow-md";
-                card.innerHTML = `
-                    <div class="font-bold mb-2">${eq.nome} (Líder: ${eq.lider})</div>
-                    <ul class="space-y-2">
-                        ${membrosDaEquipe.map(m => `
-                            <li class="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-                                ${m.nome}
-                                <button class="bg-red-500 text-white px-2 py-1 rounded-lg hover:bg-red-600" onclick="removerMembro('${m.nome}')">Excluir</button>
-                            </li>
-                        `).join('')}
-                    </ul>
-                `;
-                listaMembrosAgrupados.appendChild(card);
-            });
+  transaction.onerror = (event) => {
+    console.error('Erro ao adicionar pontos:', event.target.error);
+  };
+}
 
-            // Atualiza placar
-            placar.innerHTML = '';
-            Object.keys(pontuacoes).sort((a, b) => pontuacoes[b] - pontuacoes[a]).forEach(eq => {
-                let equipeInfo = equipes.find(e => e.nome === eq);
-                let card = document.createElement('div');
-                card.className = "bg-white p-4 rounded-lg shadow-md text-center";
-                card.style.backgroundColor = equipeInfo.cor;
-                card.innerHTML = `<strong class="text-white">${eq}</strong><br><span class="text-white">${pontuacoes[eq]} pontos</span>`;
-                placar.appendChild(card);
-            });
+// Função para remover uma equipe
+function removerEquipe(nomeEquipe) {
+  const transaction = db.transaction(['equipes', 'membros', 'pontuacoes'], 'readwrite');
+  const equipeStore = transaction.objectStore('equipes');
+  const membroStore = transaction.objectStore('membros');
+  const pontuacaoStore = transaction.objectStore('pontuacoes');
 
-            // Atualiza histórico de desafios
-            historicoDesafiosElement.innerHTML = '';
-            historicoDesafios.forEach((desafio, index) => {
-                let li = document.createElement('li');
-                li.className = "flex justify-between items-center p-2 bg-gray-50 rounded-lg";
-                li.innerHTML = `
-                    <span>${desafio.desafio} - ${desafio.equipe} (+${desafio.pontos} pontos)</span>
-                    <button class="text-red-500 hover:text-red-700" onclick="removerDesafio(${index})">🗑️</button>
-                `;
-                historicoDesafiosElement.appendChild(li);
-            });
-        }
+  // Remove a equipe
+  equipeStore.delete(nomeEquipe);
 
-        atualizarListas();
-    </script>
+  // Remove os membros da equipe
+  const membroRequest = membroStore.openCursor();
+  membroRequest.onsuccess = (event) => {
+    const cursor = event.target.result;
+    if (cursor) {
+      if (cursor.value.equipe === nomeEquipe) {
+        cursor.delete();
+      }
+      cursor.continue();
+    }
+  };
+
+  // Remove a pontuação da equipe
+  pontuacaoStore.delete(nomeEquipe);
+
+  transaction.oncomplete = () => {
+    console.log('Equipe, membros e pontuação removidos com sucesso!');
+    carregarDadosIniciais();
+  };
+
+  transaction.onerror = (event) => {
+    console.error('Erro ao remover equipe:', event.target.error);
+  };
+}
+
+// Função para remover um membro
+function removerMembro(idMembro) {
+  const transaction = db.transaction(['membros'], 'readwrite');
+  const store = transaction.objectStore('membros');
+
+  store.delete(idMembro);
+
+  transaction.oncomplete = () => {
+    console.log('Membro removido com sucesso!');
+    carregarDadosIniciais();
+  };
+
+  transaction.onerror = (event) => {
+    console.error('Erro ao remover membro:', event.target.error);
+  };
+}
+
+// Função para remover um desafio do histórico
+function removerDesafio(idDesafio) {
+  const transaction = db.transaction(['historicoDesafios'], 'readwrite');
+  const store = transaction.objectStore('historicoDesafios');
+
+  store.delete(idDesafio);
+
+  transaction.oncomplete = () => {
+    console.log('Desafio removido com sucesso!');
+    carregarDadosIniciais();
+  };
+
+  transaction.onerror = (event) => {
+    console.error('Erro ao remover desafio:', event.target.error);
+  };
+}
+
+// Função para buscar todas as equipes
+function buscarEquipes(callback) {
+  const transaction = db.transaction(['equipes'], 'readonly');
+  const store = transaction.objectStore('equipes');
+  const request = store.getAll();
+
+  request.onsuccess = () => {
+    callback(request.result);
+  };
+
+  request.onerror = (event) => {
+    console.error('Erro ao buscar equipes:', event.target.error);
+  };
+}
+
+// Função para buscar todos os membros
+function buscarMembros(callback) {
+  const transaction = db.transaction(['membros'], 'readonly');
+  const store = transaction.objectStore('membros');
+  const request = store.getAll();
+
+  request.onsuccess = () => {
+    callback(request.result);
+  };
+
+  request.onerror = (event) => {
+    console.error('Erro ao buscar membros:', event.target.error);
+  };
+}
+
+// Função para buscar todas as pontuações
+function buscarPontuacoes(callback) {
+  const transaction = db.transaction(['pontuacoes'], 'readonly');
+  const store = transaction.objectStore('pontuacoes');
+  const request = store.getAll();
+
+  request.onsuccess = () => {
+    callback(request.result);
+  };
+
+  request.onerror = (event) => {
+    console.error('Erro ao buscar pontuações:', event.target.error);
+  };
+}
+
+// Função para buscar o histórico de desafios
+function buscarHistoricoDesafios(callback) {
+  const transaction = db.transaction(['historicoDesafios'], 'readonly');
+  const store = transaction.objectStore('historicoDesafios');
+  const request = store.getAll();
+
+  request.onsuccess = () => {
+    callback(request.result);
+  };
+
+  request.onerror = (event) => {
+    console.error('Erro ao buscar histórico de desafios:', event.target.error);
+  };
+}
+
+// Função para atualizar a interface
+function atualizarListas(equipes, membros, pontuacoes, historicoDesafios) {
+  let listaEquipes = document.getElementById('listaEquipes');
+  let selecionarEquipe = document.getElementById('selecionarEquipe');
+  let selecionarEquipePontos = document.getElementById('selecionarEquipePontos');
+  let listaMembrosAgrupados = document.getElementById('listaMembrosAgrupados');
+  let placar = document.getElementById('placar');
+  let historicoDesafiosElement = document.getElementById('historicoDesafios');
+
+  // Atualiza lista de equipes
+  listaEquipes.innerHTML = '';
+  selecionarEquipe.innerHTML = '';
+  selecionarEquipePontos.innerHTML = '';
+  equipes.forEach(eq => {
+    let li = document.createElement('li');
+    li.className = "flex justify-between items-center p-2 bg-blue-50 rounded-lg";
+    li.innerHTML = `${eq.nome} (Líder: ${eq.lider}, Cor: ${eq.cor}) <button class="bg-red-500 text-white px-2 py-1 rounded-lg hover:bg-red-600" onclick="removerEquipe('${eq.nome}')">Excluir</button>`;
+    listaEquipes.appendChild(li);
+
+    let option = document.createElement('option');
+    option.value = eq.nome;
+    option.textContent = eq.nome;
+    selecionarEquipe.appendChild(option);
+    selecionarEquipePontos.appendChild(option.cloneNode(true));
+  });
+
+  // Atualiza lista de membros agrupados por equipe
+  listaMembrosAgrupados.innerHTML = '';
+  equipes.forEach(eq => {
+    let membrosDaEquipe = membros.filter(m => m.equipe === eq.nome);
+    let card = document.createElement('div');
+    card.className = "bg-white p-4 rounded-lg shadow-md";
+    card.innerHTML = `
+      <div class="font-bold mb-2">${eq.nome} (Líder: ${eq.lider})</div>
+      <ul class="space-y-2">
+        ${membrosDaEquipe.map(m => `
+          <li class="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+            ${m.nome}
+            <button class="bg-red-500 text-white px-2 py-1 rounded-lg hover:bg-red-600" onclick="removerMembro(${m.id})">Excluir</button>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+    listaMembrosAgrupados.appendChild(card);
+  });
+
+  // Atualiza placar
+  placar.innerHTML = '';
+  pontuacoes.forEach(pontuacao => {
+    let equipeInfo = equipes.find(e => e.nome === pontuacao.equipe);
+    let card = document.createElement('div');
+    card.className = "bg-white p-4 rounded-lg shadow-md text-center";
+    card.style.backgroundColor = equipeInfo.cor;
+    card.innerHTML = `<strong class="text-white">${pontuacao.equipe}</strong><br><span class="text-white">${pontuacao.pontos} pontos</span>`;
+    placar.appendChild(card);
+  });
+
+  // Atualiza histórico de desafios
+  historicoDesafiosElement.innerHTML = '';
+  historicoDesafios.forEach(desafio => {
+    let li = document.createElement('li');
+    li.className = "flex justify-between items-center p-2 bg-gray-50 rounded-lg";
+    li.innerHTML = `
+      <span>${desafio.desafio} - ${desafio.equipe} (+${desafio.pontos} pontos)</span>
+      <button class="text-red-500 hover:text-red-700" onclick="removerDesafio(${desafio.id})">🗑️</button>
+    `;
+    historicoDesafiosElement.appendChild(li);
+  });
+}
+
+// Função para zerar todos os dados
+function zerarDados() {
+  const transaction = db.transaction(['equipes', 'membros', 'pontuacoes', 'historicoDesafios'], 'readwrite');
+  const equipeStore = transaction.objectStore('equipes');
+  const membroStore = transaction.objectStore('membros');
+  const pontuacaoStore = transaction.objectStore('pontuacoes');
+  const historicoStore = transaction.objectStore('historicoDesafios');
+
+  equipeStore.clear();
+  membroStore.clear();
+  pontuacaoStore.clear();
+  historicoStore.clear();
+
+  transaction.oncomplete = () => {
+    console.log('Todos os dados foram zerados!');
+    carregarDadosIniciais();
+  };
+
+  transaction.onerror = (event) => {
+    console.error('Erro ao zerar dados:', event.target.error);
+  };
+}
+
+// Função para exportar dados para o WhatsApp
+function exportarParaWhatsApp() {
+  buscarPontuacoes((pontuacoes) => {
+    buscarHistoricoDesafios((historicoDesafios) => {
+      let placarTexto = "🏆 *Placar Atual* 🏆\n\n";
+      pontuacoes.sort((a, b) => b.pontos - a.pontos).forEach(pontuacao => {
+        placarTexto += `*${pontuacao.equipe}*: ${pontuacao.pontos} pontos\n`;
+      });
+
+      let historicoTexto = "\n📜 *Histórico de Desafios* 📜\n\n";
+      historicoDesafios.forEach(desafio => {
+        historicoTexto += `✅ ${desafio.desafio} - ${desafio.equipe} (+${desafio.pontos} pontos)\n`;
+      });
+
+      let textoCompleto = placarTexto + historicoTexto;
+      let textoCodificado = encodeURIComponent(textoCompleto);
+      window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
+    });
+  });
+}
+
+// Função para exportar membros para o WhatsApp
+function exportarMembrosParaWhatsApp() {
+  buscarEquipes((equipes) => {
+    buscarMembros((membros) => {
+      let textoMembros = "👥 *Lista de Membros por Equipe* 👥\n\n";
+      equipes.forEach(eq => {
+        let membrosDaEquipe = membros.filter(m => m.equipe === eq.nome);
+        textoMembros += `*${eq.nome}* (Líder: ${eq.lider})\n`;
+        membrosDaEquipe.forEach(m => {
+          textoMembros += `- ${m.nome}\n`;
+        });
+        textoMembros += "\n";
+      });
+
+      let textoCodificado = encodeURIComponent(textoMembros);
+      window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
+    });
+  });
+}
+
+// Função para confirmar a exclusão de todos os dados
+function confirmarZerarDados() {
+  if (confirm("Tem certeza que deseja zerar todos os dados? Essa ação não pode ser desfeita.")) {
+    zerarDados();
+  }
+}
+
+// Inicializa a interface
+carregarDadosIniciais();
+</script>     
 <script>
   if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
