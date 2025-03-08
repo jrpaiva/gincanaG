@@ -94,6 +94,27 @@
         </main>
     </div>
     <script>
+
+// Função para alternar o menu lateral no mobile
+         document.getElementById('botaoMenu').addEventListener('click', () => {
+             const menu = document.querySelector('.menu-lateral');
+             menu.classList.toggle('colapsado');
+
+
+
+// Função para mostrar uma seção e recolher o menu lateral (em dispositivos móveis)
+         function mostrarSecao(id) {
+             document.querySelectorAll('.section').forEach(sec => sec.classList.add('hidden'));
+             document.getElementById(id).classList.remove('hidden');
+
+
+// Recolhe o menu lateral em dispositivos móveis
+             if (window.innerWidth < 768) {
+                 const menu = document.querySelector('.menu-lateral');
+                 menu.classList.add('colapsado');
+             }
+         }
+
 let db;
 
 // Abre ou cria o banco de dados IndexedDB
