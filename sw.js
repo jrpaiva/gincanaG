@@ -1,51 +1,26 @@
-// sw.js
-
-const CACHE_NAME = 'meu-app-cache-v1';
-const ASSETS_TO_CACHE = [
-  '/index.html',
-  '/styles.css',
-  '/script.js',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
+const CACHE_NAME = 'gincanag-v1';
+const ASSETS = [
+  '/gincanaG/',
+  '/gincanaG/index.html',
+  '/gincanaG/manifest.json',
+  '/gincanaG/icon-192x192.png',
+  '/gincanaG/icon-512x512.png',
+  '/gincanaG/styles/styles.css',
+  '/gincanaG/scripts/main.js'
 ];
 
-// Instalação do Service Worker
+// Instala o Service Worker e armazena os arquivos em cache
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
+      .then((cache) => cache.addAll(ASSETS))
   );
 });
 
-// Interceptação de requisições
+// Intercepta as requisições e serve os arquivos do cache
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
-      .then((response) => {
-        // Retorna o arquivo do cache se ele existir
-        if (response) {
-          return response;
-        }
-
-        // Caso contrário, faz a requisição ao servidor
-        return fetch(event.request);
-      })
-  );
-});
-
-// Limpeza de caches antigos
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+      .then((response) => response || fetch(event.request))
   );
 });
