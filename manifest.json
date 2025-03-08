@@ -1,20 +1,20 @@
 {
+  "name": "GincanaG",
   "short_name": "GincanaG",
-  "name": "GincanaG - Gerenciador de Gincanas",
-  "icons": [
-    {
-      "src": "icon-192x192.png",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "icon-512x512.png",
-      "type": "image/png",
-      "sizes": "512x512"
-    }
-  ],
-  "start_url": "/index.html",
+  "start_url": "/gincanaG/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4a90e2"
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/gincanaG/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/gincanaG/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
